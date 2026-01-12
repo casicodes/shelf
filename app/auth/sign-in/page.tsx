@@ -1,0 +1,83 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+export default function SignInPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectedFrom = searchParams.get("redirectedFrom") ?? "/";
+
+  const supabase = useMemo(() => createClient(), []);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    startTransition(async () => {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+      router.push(redirectedFrom);
+      router.refresh();
+    });
+  }
+
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6">
+      <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+      <p className="mt-2 text-sm text-zinc-600">Save and search your bookmarks.</p>
+
+      <form onSubmit={onSubmit} className="mt-8 space-y-3">
+        <input
+          className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+          placeholder="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          required
+        />
+        <input
+          className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+          placeholder="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+          required
+        />
+
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+
+        <button
+          className="w-full rounded-lg bg-ink px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          type="submit"
+          disabled={isPending}
+        >
+          Sign in
+        </button>
+      </form>
+
+      <div className="mt-6 flex items-center justify-between text-sm">
+        <Link className="text-zinc-600 hover:text-zinc-900" href="/auth/forgot-password">
+          Forgot password
+        </Link>
+        <Link className="text-zinc-600 hover:text-zinc-900" href="/auth/sign-up">
+          Create account
+        </Link>
+      </div>
+    </main>
+  );
+}
+
