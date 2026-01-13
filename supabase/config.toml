@@ -1,4 +1,4 @@
-project_id = "stash"
+project_id = "shelf"
 
 [api]
 enabled = true

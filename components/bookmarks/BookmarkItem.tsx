@@ -125,7 +125,7 @@ export function BookmarkItem({
             e.stopPropagation();
             onDelete(bookmark.id);
           }}
-          className={`flex h-10 w-10 items-center justify-center rounded-xl text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-500 active:scale-[0.97] ${
+          className={`flex h-10 w-10 items-center justify-center rounded-xl text-neutral-500 transition-colors hover:bg-white hover:text-red-600 active:scale-[0.97] ${
             isHovered ? "opacity-100" : "opacity-0"
           }`}
           title="Delete bookmark"

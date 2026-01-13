@@ -1,4 +1,4 @@
-# Stash
+# Shelf
 
 Minimal bookmarking app with Supabase auth and semantic search.
 

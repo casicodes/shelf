@@ -29,7 +29,7 @@ export default function ExtensionCallbackPage() {
   function sendTokenToExtension(token: string) {
     // Send token to extension via postMessage
     // The extension listens for this message
-    window.postMessage({ type: "STASH_AUTH_TOKEN", token }, "*");
+    window.postMessage({ type: "SHELF_AUTH_TOKEN", token }, "*");
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -73,7 +73,7 @@ export default function ExtensionCallbackPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h1 className="mt-6 text-2xl font-semibold tracking-tight">Connected to Stash</h1>
+        <h1 className="mt-6 text-2xl font-semibold tracking-tight">Connected to Shelf</h1>
         <p className="mt-2 text-sm text-zinc-600">
           You can close this tab and return to the extension.
         </p>
@@ -91,7 +91,7 @@ export default function ExtensionCallbackPage() {
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6">
       <h1 className="text-2xl font-semibold tracking-tight">Connect extension</h1>
       <p className="mt-2 text-sm text-zinc-600">
-        Sign in to connect the Stash browser extension to your account.
+        Sign in to connect the Shelf browser extension to your account.
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-3">

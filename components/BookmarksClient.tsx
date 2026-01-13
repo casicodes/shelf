@@ -20,8 +20,10 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // State
-  const [mode, setMode] = useState<InputMode>("add");
+  // State - default to "add" mode when no bookmarks exist
+  const [mode, setMode] = useState<InputMode>(
+    initial.length === 0 ? "add" : "search"
+  );
   const [addInput, setAddInput] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterTag | null>(null);
 
@@ -108,13 +110,13 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
       <div className="sticky top-0 z-10 bg-white pb-4">
         <div className="flex items-center justify-between py-8">
           <div className="flex items-center gap-2">
-            <img src="/icon48.png" alt="Stash" className="h-6 w-6" />
+            <img src="/icon48.png" alt="Shelf" className="h-6 w-6" />
             <div className="font-medium text-neutral-700">
-              Stash - All your bookmarks in one place
+              Shelf - All your bookmarks in one place
             </div>
           </div>
           <button
-            className="text-neutral-600 hover:text-neutral-900"
+            className="text-neutral-500 hover:text-neutral-900 underline underline-offset-2"
             type="button"
             onClick={handleSignOut}
           >
@@ -132,18 +134,17 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
           onSubmit={handleSubmit}
         />
 
-        {mode === "search" && (
-          <FilterTags
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-          />
-        )}
-
-        <div className="mt-8">
-          <div className="text-xs font-medium tracking-wide text-neutral-500">
-            TITLE
+        {items.length > 0 && (
+          <div className="mt-8 flex items-center justify-between">
+            <div className="text-sm text-neutral-500">
+              Your shelf of bookmarks
+            </div>
+            <FilterTags
+              activeFilter={activeFilter}
+              onFilterChange={setActiveFilter}
+            />
           </div>
-        </div>
+        )}
       </div>
 
       {/* Bookmark list */}

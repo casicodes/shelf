@@ -65,9 +65,7 @@ export const BookmarkInput = forwardRef<HTMLInputElement, BookmarkInputProps>(
             ref={ref}
             className="h-7 w-full bg-transparent outline-none placeholder:text-neutral-400"
             placeholder={
-              mode === "add"
-                ? "Insert a link, image, or just plain text..."
-                : "Search"
+              mode === "add" ? "Insert a link or just plain text..." : "Search"
             }
             value={mode === "add" ? addValue : searchValue}
             onChange={(e) =>
@@ -83,12 +81,12 @@ export const BookmarkInput = forwardRef<HTMLInputElement, BookmarkInputProps>(
                 <span className="flex size-7 items-center justify-center rounded-md bg-neutral-100/50 text-xs font-medium  text-neutral-500">
                   ⌘
                 </span>
-                <span className="flex size-7 items-center justify-center rounded-md bg-neutral-100/50 text-xs font-medium text-neutral-500">
+                <span className="font-mono flex size-7 items-center justify-center rounded-md bg-neutral-100/50 text-xs font-medium text-neutral-500">
                   F
                 </span>
               </>
             ) : (
-              <span className="flex h-7 px-2 items-center justify-center rounded-md bg-neutral-100/50 text-xs font-medium text-neutral-500">
+              <span className="font-mono flex h-7 px-2 items-center justify-center rounded-md bg-neutral-100/50 text-xs font-medium text-neutral-500">
                 Esc
               </span>
             )}

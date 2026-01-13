@@ -37,7 +37,7 @@ function SignInForm() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6">
       <Image
-        alt="Stash logo"
+        alt="Shelf logo"
         className="mb-6 rounded-xl"
         height={40}
         priority

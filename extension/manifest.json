@@ -1,19 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "Stash - Save Bookmarks",
+  "name": "Shelf - Save Bookmarks",
   "version": "1.0.0",
-  "description": "Save any page to your Stash bookmarks with one click",
+  "description": "Save any page to your Shelf bookmarks with one click",
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "contextMenus"
   ],
   "host_permissions": [
     "http://localhost:3000/*",
-    "https://*.vercel.app/*"
+    "https://*.vercel.app/*",
+    "http://*/*",
+    "https://*/*"
   ],
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -27,5 +29,11 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "popup.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

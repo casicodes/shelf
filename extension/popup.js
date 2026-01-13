@@ -1,7 +1,20 @@
-// Configuration - update with your Stash app URL
-const STASH_URL = "http://localhost:3000";
-const API_URL = `${STASH_URL}/api/bookmarks`;
-const AUTH_URL = `${STASH_URL}/auth/extension-callback`;
+// Configuration - update with your Shelf app URL
+const SHELF_URL = "http://localhost:3000";
+const API_URL = `${SHELF_URL}/api/bookmarks`;
+const AUTH_URL = `${SHELF_URL}/auth/extension-callback`;
+
+// Check if running as overlay (injected into page)
+const isOverlay = new URLSearchParams(window.location.search).has("overlay");
+
+// Close the popup/overlay
+function closePopup() {
+  if (isOverlay) {
+    // Tell parent page to hide overlay
+    window.parent.postMessage({ type: "SHELF_OVERLAY_CLOSE" }, "*");
+  } else {
+    window.close();
+  }
+}
 
 // DOM elements
 const authCard = document.getElementById("auth-card");
@@ -21,12 +34,12 @@ function showCard(card) {
 
 // Token management
 async function getToken() {
-  const result = await chrome.storage.local.get(["stash_token"]);
-  return result.stash_token || null;
+  const result = await chrome.storage.local.get(["shelf_token"]);
+  return result.shelf_token || null;
 }
 
 async function clearToken() {
-  await chrome.storage.local.remove(["stash_token"]);
+  await chrome.storage.local.remove(["shelf_token"]);
 }
 
 // Get current tab
@@ -35,8 +48,19 @@ async function getCurrentTab() {
   return tab;
 }
 
-// Save the current tab
-async function saveCurrentTab() {
+// Check for pending save from context menu
+async function getPendingSave() {
+  const result = await chrome.storage.local.get(["shelf_pending_save"]);
+  if (result.shelf_pending_save) {
+    // Clear it immediately so it doesn't trigger again
+    await chrome.storage.local.remove(["shelf_pending_save"]);
+    return result.shelf_pending_save;
+  }
+  return null;
+}
+
+// Save a bookmark
+async function saveBookmark(url, notes = null) {
   showCard(savingCard);
 
   const token = await getToken();
@@ -45,20 +69,17 @@ async function saveCurrentTab() {
     return;
   }
 
-  const tab = await getCurrentTab();
-  if (!tab?.url) {
-    showCard(authCard);
-    return;
-  }
-
   try {
+    const body = { url };
+    if (notes) body.notes = notes;
+
     const response = await fetch(API_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ url: tab.url }),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json();
@@ -77,44 +98,61 @@ async function saveCurrentTab() {
         data.error?.toLowerCase().includes("unique")
       ) {
         showCard(alreadySavedCard);
-        setTimeout(() => window.close(), 3000);
+        setTimeout(closePopup, 3000);
         return;
       }
 
       // For other errors, show already saved as fallback
       showCard(alreadySavedCard);
-      setTimeout(() => window.close(), 3000);
+      setTimeout(closePopup, 3000);
       return;
     }
 
     // Success
     showCard(savedCard);
-    setTimeout(() => window.close(), 3000);
+    setTimeout(closePopup, 3000);
   } catch (error) {
     // Network error - show auth card
     showCard(authCard);
   }
 }
 
+// Save the current tab (used when clicking extension icon)
+async function saveCurrentTab() {
+  const tab = await getCurrentTab();
+  if (!tab?.url) {
+    showCard(authCard);
+    return;
+  }
+  await saveBookmark(tab.url);
+}
+
 // Event listeners
 connectBtn.addEventListener("click", () => {
   chrome.tabs.create({ url: AUTH_URL });
-  window.close();
+  closePopup();
 });
 
 viewLink.addEventListener("click", (e) => {
   e.preventDefault();
-  chrome.tabs.create({ url: STASH_URL });
-  window.close();
+  chrome.tabs.create({ url: SHELF_URL });
+  closePopup();
 });
 
 // Initialize
 async function init() {
   const token = await getToken();
-  if (token) {
-    saveCurrentTab();
-  } else {
+  if (!token) {
     showCard(authCard);
+    return;
+  }
+
+  // Check for pending save from context menu first
+  const pendingSave = await getPendingSave();
+  if (pendingSave) {
+    await saveBookmark(pendingSave.url, pendingSave.notes);
+  } else {
+    await saveCurrentTab();
   }
 }
 

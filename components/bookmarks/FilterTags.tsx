@@ -9,7 +9,7 @@ type FilterTagsProps = {
 
 export function FilterTags({ activeFilter, onFilterChange }: FilterTagsProps) {
   return (
-    <div className="mt-4 flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2">
       {FILTER_TAGS.map((tag) => (
         <button
           key={tag.id}
