@@ -21,6 +21,19 @@ console.log("Shelf: Content script loaded");
       right: 16px !important;
       z-index: 2147483647 !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+      transform: translateX(120%) !important;
+      opacity: 0 !important;
+      transition: transform 0.3s ease-out, opacity 0.3s ease-out !important;
+    }
+
+    #shelf-save-overlay.visible {
+      transform: translateX(0) !important;
+      opacity: 1 !important;
+    }
+
+    #shelf-save-overlay.hiding {
+      transform: translateX(120%) !important;
+      opacity: 0 !important;
     }
 
     #shelf-save-overlay .shelf-card {
@@ -161,6 +174,13 @@ console.log("Shelf: Content script loaded");
   `;
   document.body.appendChild(overlay);
 
+  // Trigger slide-in animation
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      overlay.classList.add("visible");
+    });
+  });
+
   console.log("Shelf: Overlay created");
 
   const AUTH_URL = `${SHELF_URL}/auth/extension-callback`;
@@ -173,13 +193,12 @@ console.log("Shelf: Content script loaded");
     document.getElementById(id)?.classList.add("active");
   }
 
-  // Helper to hide overlay with animation
+  // Helper to hide overlay with slide-out animation
   function hideOverlay(delay = 2500) {
     setTimeout(() => {
-      overlay.style.opacity = "0";
-      overlay.style.transform = "translateY(-10px)";
-      overlay.style.transition = "all 0.2s ease-out";
-      setTimeout(() => overlay.remove(), 200);
+      overlay.classList.remove("visible");
+      overlay.classList.add("hiding");
+      setTimeout(() => overlay.remove(), 300);
     }, delay);
   }
 

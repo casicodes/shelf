@@ -47,19 +47,239 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   if (info.menuItemId === "save-page") {
     url = tab.url;
+    pendingSave = { url, notes, tabId: tab.id };
+    await injectOverlay(tab.id);
   } else if (info.menuItemId === "save-selection") {
-    url = tab.url;
-    notes = info.selectionText;
+    // Save selection as a text note (not as a page bookmark)
+    const plainText = info.selectionText || "";
+    const sourceUrl = tab.url;
+    pendingSave = {
+      url: null,
+      notes: null,
+      tabId: tab.id,
+      sourceUrl,
+      awaitingSelection: true,
+    };
+    await captureFormattedSelection(tab.id, plainText);
   } else if (info.menuItemId === "save-link") {
     url = info.linkUrl;
-  }
-
-  if (url) {
-    // Store pending save for after overlay is ready
     pendingSave = { url, notes, tabId: tab.id };
     await injectOverlay(tab.id);
   }
 });
+
+// Capture formatted selection from the page before showing overlay
+async function captureFormattedSelection(tabId, plainText) {
+  // Ensure we always have content - use plainText as the base
+  let content = plainText || "";
+
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: getFormattedSelection,
+      args: [plainText],
+    });
+
+    // Only use script result if it's non-empty
+    if (results && results[0]?.result && results[0].result.trim()) {
+      content = results[0].result;
+    }
+  } catch (error) {
+    console.error("Shelf: Failed to capture selection", error);
+    // Keep using plainText as content (already set above)
+  }
+
+  // Ensure we have content - fall back to plainText if formatting produced empty result
+  if (!content || !content.trim()) {
+    content = plainText || "";
+  }
+
+  // Build the final content with source reference
+  if (content && content.trim()) {
+    const sourceUrl = pendingSave.sourceUrl;
+    let fullContent = content;
+
+    if (sourceUrl) {
+      try {
+        const hostname = new URL(sourceUrl).hostname;
+        fullContent = `${content}\n\n---\n_Source: [${hostname}](${sourceUrl})_`;
+      } catch {
+        // Invalid URL (e.g., PDF viewer, about: pages) - just use content without source
+        fullContent = content;
+      }
+    }
+
+    pendingSave.url = fullContent;
+    pendingSave.notes = null;
+  }
+
+  pendingSave.awaitingSelection = false;
+  await injectOverlay(tabId);
+}
+
+// This function runs in the page context to extract formatted selection
+function getFormattedSelection(originalPlainText) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) {
+    // Selection was cleared, use the original plain text
+    return originalPlainText || null;
+  }
+
+  const range = selection.getRangeAt(0);
+  const container = document.createElement("div");
+  container.appendChild(range.cloneContents());
+
+  // Get the plain text from our captured content
+  const capturedPlainText = container.textContent || "";
+
+  // Normalize text for comparison (remove extra whitespace)
+  function normalizeForComparison(text) {
+    return text.replace(/\s+/g, " ").trim().toLowerCase();
+  }
+
+  const normalizedOriginal = normalizeForComparison(originalPlainText || "");
+  const normalizedCaptured = normalizeForComparison(capturedPlainText);
+
+  // If the captured content doesn't match the original selection, use plain text
+  // This handles cases where selection changed or was expanded
+  if (normalizedOriginal && normalizedCaptured !== normalizedOriginal) {
+    // Check if captured is significantly different (not just whitespace differences)
+    const originalWords = normalizedOriginal.split(" ").filter(Boolean);
+    const capturedWords = normalizedCaptured.split(" ").filter(Boolean);
+
+    // If captured has significantly more content, the selection probably changed
+    if (capturedWords.length > originalWords.length * 1.5) {
+      return originalPlainText;
+    }
+  }
+
+  // Convert HTML to formatted text
+  function htmlToFormattedText(element) {
+    let result = "";
+
+    function processNode(node, context = {}) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        let text = node.textContent;
+        // Preserve meaningful whitespace but normalize excessive spaces
+        if (context.preserveWhitespace) {
+          return text;
+        }
+        // Collapse multiple spaces but keep single spaces
+        text = text.replace(/[ \t]+/g, " ");
+        // Trim leading space if we're at the start of a list item
+        if (context.listItemStart) {
+          text = text.replace(/^\s+/, "");
+        }
+        return text;
+      }
+
+      if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+      const tag = node.tagName.toLowerCase();
+      let prefix = "";
+      let suffix = "";
+      let childContext = { ...context };
+
+      // Handle block elements
+      const blockElements = [
+        "p",
+        "div",
+        "section",
+        "article",
+        "main",
+        "header",
+        "footer",
+        "aside",
+        "nav",
+      ];
+      const headings = ["h1", "h2", "h3", "h4", "h5", "h6"];
+
+      if (headings.includes(tag)) {
+        const level = parseInt(tag[1]);
+        prefix = "\n\n" + "#".repeat(level) + " ";
+        suffix = "\n";
+      } else if (blockElements.includes(tag)) {
+        // Don't add newlines for block elements inside list items
+        if (!context.insideListItem) {
+          prefix = "\n\n";
+        } else {
+          // Inside list items, treat block elements as inline
+          prefix = "";
+        }
+        suffix = "";
+      } else if (tag === "br") {
+        return "\n";
+      } else if (tag === "hr") {
+        return "\n\n---\n\n";
+      } else if (tag === "li") {
+        const parent = node.parentElement?.tagName.toLowerCase();
+        if (parent === "ol") {
+          const index =
+            Array.from(node.parentElement.children).indexOf(node) + 1;
+          prefix = "\n" + index + ". ";
+        } else {
+          prefix = "\n- ";
+        }
+        childContext.insideListItem = true;
+        childContext.listItemStart = true;
+      } else if (tag === "ul" || tag === "ol") {
+        // Need blank line before list for markdown parsers
+        prefix = "\n\n";
+        suffix = "\n";
+      } else if (tag === "blockquote") {
+        prefix = "\n\n> ";
+        suffix = "\n";
+      } else if (tag === "pre" || tag === "code") {
+        childContext.preserveWhitespace = true;
+        if (tag === "pre") {
+          prefix = "\n\n```\n";
+          suffix = "\n```\n";
+        }
+      } else if (tag === "strong" || tag === "b") {
+        prefix = "**";
+        suffix = "**";
+      } else if (tag === "em" || tag === "i") {
+        prefix = "_";
+        suffix = "_";
+      } else if (tag === "a") {
+        const href = node.getAttribute("href");
+        if (href && !href.startsWith("javascript:")) {
+          suffix = ` (${href})`;
+        }
+      }
+
+      let content = "";
+      for (const child of node.childNodes) {
+        content += processNode(child, childContext);
+        // After first child, we're no longer at list item start
+        childContext.listItemStart = false;
+      }
+
+      return prefix + content + suffix;
+    }
+
+    for (const child of element.childNodes) {
+      result += processNode(child);
+    }
+
+    // Clean up the result
+    return result
+      .replace(/\n{3,}/g, "\n\n") // Max 2 consecutive newlines
+      .replace(/^\n+/, "") // Remove leading newlines
+      .replace(/\n+$/, "") // Remove trailing newlines
+      .replace(/[ \t]+$/gm, "") // Remove trailing spaces on each line
+      .trim();
+  }
+
+  const formatted = htmlToFormattedText(container);
+
+  // If formatting didn't produce meaningful structure, fall back to plain text
+  if (!formatted || formatted.length === 0) {
+    return originalPlainText || selection.toString().trim();
+  }
+
+  return formatted;
+}
 
 // Pending save data
 let pendingSave = null;
@@ -72,6 +292,16 @@ async function getToken() {
 
 // Save bookmark via API
 async function saveBookmark(url, notes, tabId) {
+  // Validate url before proceeding
+  if (!url || !url.trim()) {
+    console.error("Shelf: No URL provided");
+    chrome.tabs.sendMessage(tabId, {
+      type: "SHELF_SAVE_RESULT",
+      status: "error",
+    });
+    return;
+  }
+
   const token = await getToken();
   if (!token) {
     console.log("Shelf: No token");
@@ -126,7 +356,16 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "SHELF_OVERLAY_READY" && pendingSave) {
     const { url, notes, tabId } = pendingSave;
     pendingSave = null;
-    saveBookmark(url, notes, tabId);
+
+    // Only save if we have a url (content)
+    if (url && url.trim()) {
+      saveBookmark(url, notes, tabId);
+    } else {
+      chrome.tabs.sendMessage(tabId, {
+        type: "SHELF_SAVE_RESULT",
+        status: "error",
+      });
+    }
   }
   return true;
 });
