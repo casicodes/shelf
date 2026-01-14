@@ -24,9 +24,9 @@ export default function ExtensionCallbackPage() {
   useEffect(() => {
     if (!supabase) return;
     
+    const client = supabase;
     async function checkAuth() {
-      if (!supabase) return;
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await client.auth.getSession();
       if (session?.access_token) {
         sendTokenToExtension(session.access_token);
         setIsConnected(true);
@@ -46,9 +46,10 @@ export default function ExtensionCallbackPage() {
     e.preventDefault();
     if (!supabase) return;
     
+    const client = supabase;
     setError(null);
     startTransition(async () => {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await client.auth.signInWithPassword({
         email,
         password
       });
