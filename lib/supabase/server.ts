@@ -13,7 +13,9 @@ export async function createClient() {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !anonKey) {
-    throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    // Return null instead of throwing to allow graceful error handling
+    // This prevents 500 errors when env vars are missing
+    return null;
   }
 
   return createServerClient(url, anonKey, {

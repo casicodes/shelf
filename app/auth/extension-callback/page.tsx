@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ExtensionCallbackPage() {
-  const supabase = useMemo(() => createClient(), []);
+  const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -15,8 +15,15 @@ export default function ExtensionCallbackPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  // Create client only after mount to avoid SSR issues
+  useEffect(() => {
+    setSupabase(createClient());
+  }, []);
+
   // Check if user is already authenticated
   useEffect(() => {
+    if (!supabase) return;
+    
     async function checkAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) {
@@ -36,6 +43,8 @@ export default function ExtensionCallbackPage() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!supabase) return;
+    
     setError(null);
     startTransition(async () => {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({

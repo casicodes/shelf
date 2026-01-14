@@ -28,6 +28,10 @@ export async function OPTIONS() {
 // Get user from Bearer token (extension) or cookie auth (web app)
 async function getAuthenticatedUser(req: Request) {
   const supabase = await createClient();
+  if (!supabase) {
+    return null;
+  }
+
   const authHeader = req.headers.get("Authorization");
 
   if (authHeader?.startsWith("Bearer ")) {
@@ -50,6 +54,12 @@ export async function GET(req: Request) {
   }
 
   const supabase = await createClient();
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Server configuration error" },
+      { status: 500, headers: corsHeaders() }
+    );
+  }
 
   const { searchParams } = new URL(req.url);
   const filterTag = searchParams.get("tag");
@@ -136,6 +146,12 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createClient();
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Server configuration error" },
+      { status: 500, headers: corsHeaders() }
+    );
+  }
 
   const json = await req.json().catch(() => null);
   const parsed = CreateBookmarkSchema.safeParse(json);

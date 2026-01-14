@@ -7,6 +7,12 @@ type RouteContext = {
 
 export async function DELETE(req: Request, context: RouteContext) {
   const supabase = await createClient();
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Server configuration error" },
+      { status: 500 }
+    );
+  }
   const {
     data: { user },
   } = await supabase.auth.getUser();
