@@ -25,6 +25,7 @@ export default function ExtensionCallbackPage() {
     if (!supabase) return;
     
     async function checkAuth() {
+      if (!supabase) return;
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.access_token) {
         sendTokenToExtension(session.access_token);
