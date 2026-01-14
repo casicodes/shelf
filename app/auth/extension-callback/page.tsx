@@ -3,13 +3,12 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ExtensionCallbackPage() {
-  const [supabase, setSupabase] = useState<ReturnType<
-    typeof createClient
-  > | null>(null);
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -17,43 +16,43 @@ export default function ExtensionCallbackPage() {
   const [isConnected, setIsConnected] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // Create client only after mount to avoid SSR issues
   useEffect(() => {
-    setSupabase(createClient());
-  }, []);
+    // Create client only after mount to avoid SSR/window issues
+    supabaseRef.current = createClient();
 
-  // Check if user is already authenticated
-  useEffect(() => {
-    if (!supabase) {
-      setIsCheckingAuth(false);
-      return;
-    }
-
-    const client = supabase;
     async function checkAuth() {
+      const client = supabaseRef.current;
+      if (!client) {
+        setIsCheckingAuth(false);
+        return;
+      }
+
       const {
         data: { session },
       } = await client.auth.getSession();
-      if (session?.access_token) {
-        sendTokenToExtension(session.access_token);
+
+      const token = session?.access_token;
+      if (token) {
+        sendTokenToExtension(token);
         setIsConnected(true);
       }
       setIsCheckingAuth(false);
     }
+
     checkAuth();
-  }, [supabase]);
+  }, []);
 
   function sendTokenToExtension(token: string) {
-    // Send token to extension via postMessage
-    // The extension listens for this message
+    // TODO (recommended): validate the origin instead of "*"
     window.postMessage({ type: "SHELF_AUTH_TOKEN", token }, "*");
   }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!supabase) return;
 
-    const client = supabase;
+    const client = supabaseRef.current;
+    if (!client) return;
+
     setError(null);
     startTransition(async () => {
       const { data, error: signInError } = await client.auth.signInWithPassword(
@@ -62,12 +61,15 @@ export default function ExtensionCallbackPage() {
           password,
         }
       );
+
       if (signInError) {
         setError(signInError.message);
         return;
       }
-      if (data.session?.access_token) {
-        sendTokenToExtension(data.session.access_token);
+
+      const token = data.session?.access_token;
+      if (token) {
+        sendTokenToExtension(token);
         setIsConnected(true);
       }
     });
@@ -156,7 +158,7 @@ export default function ExtensionCallbackPage() {
       </form>
 
       <p className="mt-6 text-center text-sm text-zinc-600">
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <Link className="text-zinc-900 hover:underline" href="/auth/sign-up">
           Sign up
         </Link>
