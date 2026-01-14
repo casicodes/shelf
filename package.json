@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "backfill-tags": "tsx --env-file=.env.local scripts/backfill-tags.ts"
+    "backfill-tags": "tsx --env-file=.env.local scripts/backfill-tags.ts",
+    "build:extension": "node scripts/build-extension.js",
+    "package:extension": "npm run build:extension && cd extension && zip -r ../shelf-extension.zip . -x '*.md' '*.DS_Store' 'README.md' 'DISTRIBUTION.md' 'config.js' && cd .. && echo 'Extension packaged as shelf-extension.zip'"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",
