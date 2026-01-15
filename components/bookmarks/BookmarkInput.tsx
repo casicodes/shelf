@@ -10,11 +10,20 @@ type BookmarkInputProps = {
   onAddChange: (value: string) => void;
   onSearchChange: (value: string) => void;
   onSubmit: () => void;
+  onClearSearch?: () => void;
 };
 
 export const BookmarkInput = forwardRef<HTMLInputElement, BookmarkInputProps>(
   function BookmarkInput(
-    { mode, addValue, searchValue, onAddChange, onSearchChange, onSubmit },
+    {
+      mode,
+      addValue,
+      searchValue,
+      onAddChange,
+      onSearchChange,
+      onSubmit,
+      onClearSearch,
+    },
     ref
   ) {
     const handleSubmit = (e: React.FormEvent) => {
@@ -41,7 +50,7 @@ export const BookmarkInput = forwardRef<HTMLInputElement, BookmarkInputProps>(
         <div className="flex items-center gap-2 rounded-md ring-1 ring-neutral-200 shadow-sm focus-within:shadow focus-within:ring-neutral-300 px-2 py-0.5 transition-shadow">
           {mode === "add" ? (
             <svg
-              className="h-5 w-5 text-neutral-500"
+              className="h-5 w-5 flex-shrink-0 text-neutral-500"
               fill="none"
               stroke="currentColor"
               strokeWidth={2}
@@ -51,7 +60,7 @@ export const BookmarkInput = forwardRef<HTMLInputElement, BookmarkInputProps>(
             </svg>
           ) : (
             <svg
-              className="h-5 w-5 text-neutral-500"
+              className="h-5 w-5 flex-shrink-0 text-neutral-500"
               fill="none"
               stroke="currentColor"
               strokeWidth={2}
@@ -85,6 +94,22 @@ export const BookmarkInput = forwardRef<HTMLInputElement, BookmarkInputProps>(
                   F
                 </span>
               </>
+            ) : searchValue.trim() && onClearSearch ? (
+              <button
+                type="button"
+                onClick={onClearSearch}
+                className="flex items-center justify-center text-neutral-500 hover:text-neutral-800 transition-transform active:scale-[0.97] cursor-pointer"
+              >
+                <svg
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" />
+                </svg>
+              </button>
             ) : (
               <span className="text-sm flex h-5 px-2 items-center justify-center rounded-md bg-neutral-100/50 text-xs font-medium text-neutral-500">
                 Esc

@@ -246,6 +246,7 @@ export async function POST(req: Request) {
       site_name: metadata?.siteName ?? null,
       image_url: imageUrlToStore,
       notes: notesToStore,
+      content_text: metadata?.contentText ?? null,
     })
     .select("id,url,title,description,site_name,image_url,notes,created_at")
     .single();

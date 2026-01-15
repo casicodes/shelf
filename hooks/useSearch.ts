@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import type { Bookmark } from "@/types/bookmark";
 import { searchBookmarks } from "@/lib/api/bookmarks";
 
-const DEBOUNCE_MS = 200;
+const DEBOUNCE_MS = 400;
 
 export function useSearch() {
   const [query, setQuery] = useState("");

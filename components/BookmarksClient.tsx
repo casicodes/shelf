@@ -22,6 +22,8 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const deleteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const transitionUpAudioRef = useRef<HTMLAudioElement | null>(null);
+  const transitionDownAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // State - default to "add" mode when no bookmarks exist
   const [mode, setMode] = useState<InputMode>(
@@ -41,12 +43,45 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
     confirmDelete,
   } = useBookmarks(initial);
 
-  // Preload delete sound
+  // Preload audio files
   useEffect(() => {
     deleteAudioRef.current = new Audio("/audio/button.wav");
     deleteAudioRef.current.preload = "auto";
     deleteAudioRef.current.load();
+
+    transitionUpAudioRef.current = new Audio("/audio/transition_up.wav");
+    transitionUpAudioRef.current.preload = "auto";
+    transitionUpAudioRef.current.load();
+
+    transitionDownAudioRef.current = new Audio("/audio/transition_down.wav");
+    transitionDownAudioRef.current.preload = "auto";
+    transitionDownAudioRef.current.load();
   }, []);
+
+  // Play transition audio when mode changes
+  const prevModeRef = useRef<InputMode>(mode);
+  useEffect(() => {
+    if (prevModeRef.current !== mode) {
+      if (prevModeRef.current === "search" && mode === "add") {
+        // Switching to add mode - play transition_up
+        if (transitionUpAudioRef.current) {
+          transitionUpAudioRef.current.currentTime = 0;
+          transitionUpAudioRef.current.play().catch(() => {
+            // Ignore errors if audio fails to play
+          });
+        }
+      } else if (prevModeRef.current === "add" && mode === "search") {
+        // Switching to search mode - play transition_down
+        if (transitionDownAudioRef.current) {
+          transitionDownAudioRef.current.currentTime = 0;
+          transitionDownAudioRef.current.play().catch(() => {
+            // Ignore errors if audio fails to play
+          });
+        }
+      }
+      prevModeRef.current = mode;
+    }
+  }, [mode]);
 
   const handleDelete = useCallback(
     (id: string) => {
@@ -186,6 +221,7 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
               onAddChange={setAddInput}
               onSearchChange={setQuery}
               onSubmit={handleSubmit}
+              onClearSearch={clearSearch}
             />
           </div>
           <div className="flex items-center gap-4">

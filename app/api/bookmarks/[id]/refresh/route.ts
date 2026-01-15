@@ -53,7 +53,8 @@ export async function POST(
       title: metadata.title,
       description: metadata.description,
       site_name: metadata.siteName,
-      image_url: metadata.imageUrl
+      image_url: metadata.imageUrl,
+      content_text: metadata.contentText,
     })
     .eq("id", id);
 
@@ -67,6 +68,26 @@ export async function POST(
     .select("id,url,title,description,site_name,image_url,notes,created_at")
     .eq("id", id)
     .single();
+
+  // Trigger embedding update after metadata refresh (fire-and-forget)
+  const fnUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/embedding_upsert`
+    : null;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (fnUrl && serviceRoleKey) {
+    fetch(fnUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        bookmarkId: id,
+        userId: user.id,
+      }),
+    }).catch(() => {});
+  }
 
   return NextResponse.json({ bookmark: updated });
 }

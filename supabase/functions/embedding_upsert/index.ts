@@ -25,7 +25,7 @@ export default Deno.serve(async (req) => {
 
   const { data: bookmark, error: bookmarkErr } = await supabase
     .from("bookmarks")
-    .select("id,user_id,url,title,description,site_name,notes")
+    .select("id,user_id,url,title,description,site_name,notes,content_text")
     .eq("id", payload.bookmarkId)
     .single();
 
@@ -40,16 +40,46 @@ export default Deno.serve(async (req) => {
 
   const tagList = (tags ?? []).map((t) => t.tag).filter(Boolean);
 
+  // Weighted input: Title + Notes (highest priority), then content_text, Description, Tags, Site name
+  // URL omitted (rarely adds semantic meaning)
+  // content_text provides rich semantic context but user intent (title/notes) takes precedence
   const content = [
-    bookmark.title,
-    bookmark.description,
-    bookmark.notes,
-    bookmark.site_name,
-    bookmark.url,
-    tagList.length ? `tags: ${tagList.join(", ")}` : null
+    bookmark.title ?? "",
+    bookmark.notes ?? "",
+    bookmark.content_text ?? "",
+    bookmark.description ?? "",
+    tagList.length ? tagList.join(", ") : "",
+    bookmark.site_name ?? ""
   ]
     .filter(Boolean)
     .join("\n");
+
+  // Compute hash of semantic source to avoid unnecessary regenerations
+  const semanticSource = JSON.stringify({
+    title: bookmark.title,
+    description: bookmark.description,
+    notes: bookmark.notes,
+    content_text: bookmark.content_text,
+    tags: tagList.sort()
+  });
+  
+  const encoder = new TextEncoder();
+  const data = encoder.encode(semanticSource);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const semanticSourceHash = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+
+  // Check if embedding already exists with same hash
+  const { data: existing } = await supabase
+    .from("bookmark_embeddings")
+    .select("semantic_source_hash")
+    .eq("bookmark_id", payload.bookmarkId)
+    .single();
+
+  // Skip regeneration if hash hasn't changed
+  if (existing?.semantic_source_hash === semanticSourceHash) {
+    return json({ ok: true, skipped: true, reason: "hash_unchanged" });
+  }
 
   const { embedding, model } = await createEmbedding(content);
   const embeddingLiteral = vectorToSqlLiteral(embedding);
@@ -61,6 +91,7 @@ export default Deno.serve(async (req) => {
       content_for_embedding: content,
       embedding: embeddingLiteral,
       embedding_version: model,
+      semantic_source_hash: semanticSourceHash,
       updated_at: new Date().toISOString()
     },
     { onConflict: "bookmark_id" }
