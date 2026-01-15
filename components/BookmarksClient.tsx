@@ -3,14 +3,21 @@
 import { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 
-import type { Bookmark, InputMode, FilterTag } from "@/types/bookmark";
+import type { Bookmark, FilterTag } from "@/types/bookmark";
 import { FILTER_TAGS } from "@/types/bookmark";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useSearch } from "@/hooks/useSearch";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useExtensionInstalled } from "@/hooks/useExtensionInstalled";
 import { logout } from "@/lib/api/bookmarks";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { BookmarkInput, BookmarkList, FilterTags } from "./bookmarks";
 
@@ -22,16 +29,12 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const deleteAudioRef = useRef<HTMLAudioElement | null>(null);
-  const transitionUpAudioRef = useRef<HTMLAudioElement | null>(null);
-  const transitionDownAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // State - default to "add" mode when no bookmarks exist
-  const [mode, setMode] = useState<InputMode>(
-    initial.length === 0 ? "add" : "search"
-  );
-  const [addInput, setAddInput] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterTag>("all");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [addDialogValue, setAddDialogValue] = useState("");
+  const addDialogInputRef = useRef<HTMLInputElement | null>(null);
 
   // Hooks
   const {
@@ -49,40 +52,7 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
     deleteAudioRef.current = new Audio("/audio/button.wav");
     deleteAudioRef.current.preload = "auto";
     deleteAudioRef.current.load();
-
-    transitionUpAudioRef.current = new Audio("/audio/transition_up.wav");
-    transitionUpAudioRef.current.preload = "auto";
-    transitionUpAudioRef.current.load();
-
-    transitionDownAudioRef.current = new Audio("/audio/transition_down.wav");
-    transitionDownAudioRef.current.preload = "auto";
-    transitionDownAudioRef.current.load();
   }, []);
-
-  // Play transition audio when mode changes
-  const prevModeRef = useRef<InputMode>(mode);
-  useEffect(() => {
-    if (prevModeRef.current !== mode) {
-      if (prevModeRef.current === "search" && mode === "add") {
-        // Switching to add mode - play transition_up
-        if (transitionUpAudioRef.current) {
-          transitionUpAudioRef.current.currentTime = 0;
-          transitionUpAudioRef.current.play().catch(() => {
-            // Ignore errors if audio fails to play
-          });
-        }
-      } else if (prevModeRef.current === "add" && mode === "search") {
-        // Switching to search mode - play transition_down
-        if (transitionDownAudioRef.current) {
-          transitionDownAudioRef.current.currentTime = 0;
-          transitionDownAudioRef.current.play().catch(() => {
-            // Ignore errors if audio fails to play
-          });
-        }
-      }
-      prevModeRef.current = mode;
-    }
-  }, [mode]);
 
   const handleDelete = useCallback(
     (id: string) => {
@@ -128,18 +98,9 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onAddMode: useCallback(() => {
-      setMode("add");
-      setActiveFilter("all");
+      setAddDialogValue("");
+      setAddDialogOpen(true);
     }, []),
-    onSearchMode: useCallback(() => {
-      setMode("search");
-    }, []),
-    onEscape: useCallback(() => {
-      setMode("add");
-      clearSearch();
-      setActiveFilter("all");
-    }, [clearSearch]),
-    inputRef,
   });
 
   // Compute available tags from bookmarks
@@ -167,13 +128,39 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
   // Display priority: search results > filtered items > all items
   const displayed = searchResults ?? filteredItems ?? items;
 
-  // Handlers
-  const handleSubmit = async () => {
-    const url = addInput.trim();
-    if (!url) return;
+  // Focus input when add dialog opens
+  useEffect(() => {
+    if (addDialogOpen && addDialogInputRef.current) {
+      setTimeout(() => {
+        addDialogInputRef.current?.focus();
+      }, 100);
+    }
+  }, [addDialogOpen]);
 
-    setAddInput("");
-    const { error } = await addBookmark(url);
+  // Handlers
+  const handleAddDialogSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+
+    const url = addDialogValue.trim();
+    if (!url) {
+      toast.error("URL cannot be empty");
+      return;
+    }
+
+    // Validate URL using HTML5 validation
+    const input = addDialogInputRef.current;
+    if (input && !input.validity.valid) {
+      toast.error("Please enter a valid URL");
+      return;
+    }
+
+    // Close dialog immediately since bookmark will appear in list with loading state
+    setAddDialogOpen(false);
+    const urlToAdd = url;
+    setAddDialogValue("");
+
+    // Add bookmark asynchronously
+    const { error } = await addBookmark(urlToAdd);
 
     if (error) {
       if (error === "DUPLICATE_BOOKMARK") {
@@ -198,6 +185,17 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
     }
   };
 
+  const handleAddDialogKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddDialogSubmit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setAddDialogOpen(false);
+      setAddDialogValue("");
+    }
+  };
+
   const handleSignOut = async () => {
     setIsLoggingOut(true);
     await logout();
@@ -213,17 +211,32 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
             <img src="/icon48.png" alt="Shelf" className="h-6 w-6" />
             <div className="font-medium text-neutral-700">Shelf</div>
           </div>
-          <div className="flex-1">
+          <div className="flex-1 flex items-center gap-2">
             <BookmarkInput
               ref={inputRef}
-              mode={mode}
-              addValue={addInput}
               searchValue={query}
-              onAddChange={setAddInput}
               onSearchChange={setQuery}
-              onSubmit={handleSubmit}
               onClearSearch={clearSearch}
             />
+            <button
+              type="button"
+              onClick={() => {
+                setAddDialogValue("");
+                setAddDialogOpen(true);
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition ring-1 ring-neutral-200 shadow-xs bg-white hover:bg-neutral-100/80 hover:text-neutral-800 active:scale-[0.97]"
+              title="Add URL"
+            >
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 5v14m-7-7h14" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
           <div className="flex items-center gap-4">
             {!isInstalled && (
@@ -276,6 +289,51 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
           onRename={renameBookmark}
         />
       </div>
+
+      {/* Add URL Dialog */}
+      <AlertDialog
+        open={addDialogOpen}
+        onOpenChange={(open) => {
+          setAddDialogOpen(open);
+          if (!open) {
+            setAddDialogValue("");
+          }
+        }}
+      >
+        <AlertDialogContent
+          onOverlayClick={() => {
+            setAddDialogOpen(false);
+            setAddDialogValue("");
+          }}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add URL</AlertDialogTitle>
+          </AlertDialogHeader>
+          <form
+            onSubmit={handleAddDialogSubmit}
+            className="flex flex-col gap-4"
+          >
+            <input
+              ref={addDialogInputRef}
+              type="url"
+              value={addDialogValue}
+              onChange={(e) => setAddDialogValue(e.target.value)}
+              onKeyDown={handleAddDialogKeyDown}
+              required
+              className="w-full rounded-lg ring-1 ring-neutral-200 shadow-sm focus-within:shadow focus-within:ring-neutral-300 px-3 py-2 focus:border-neutral-400 focus:outline-none"
+              placeholder="https://"
+            />
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="bg-neutral-800 hover:bg-neutral-700 active:scale-[0.97] focus:ring-0 h-10 px-3 relative overflow-hidden min-w-[100px] flex items-center justify-center rounded-lg text-white font-medium transition text-sm focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-2"
+              >
+                Add to Shelf
+              </button>
+            </div>
+          </form>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

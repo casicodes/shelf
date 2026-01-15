@@ -48,6 +48,15 @@ export function BookmarkItem({
   const faviconUrl =
     isTextNote || isImageBookmark ? null : getFaviconUrl(bookmark.url);
 
+  // Extract source URL from snippet notes if it exists
+  const extractSourceUrl = (notes: string | null): string | null => {
+    if (!notes) return null;
+    const sourceMatch = notes.match(/_Source:\s*\[[^\]]+\]\(([^)]+)\)_/);
+    return sourceMatch ? sourceMatch[1] : null;
+  };
+
+  const snippetSourceUrl = isTextNote ? extractSourceUrl(bookmark.notes) : null;
+
   const displayText = isTextNote
     ? stripMarkdown(bookmark.notes ?? bookmark.title ?? "Note")
     : isImageBookmark
@@ -115,7 +124,7 @@ export function BookmarkItem({
 
   const icon =
     isTextNote && hasOgImage ? (
-      <div className="h-[50px] w-[80px] shrink-0 overflow-hidden rounded-lg bg-neutral-100 relative">
+      <div className="h-[50px] w-[80px] shrink-0 overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-neutral-100 relative">
         <img
           src={bookmark.image_url!}
           alt=""
@@ -128,7 +137,7 @@ export function BookmarkItem({
     ) : isTextNote ? (
       <div className="h-12 w-15 shrink-0 rounded-full bg-neutral-200" />
     ) : isImageBookmark ? (
-      <div className="h-[50px] w-[80px] shrink-0 overflow-hidden rounded-lg bg-neutral-100 relative">
+      <div className="h-[50px] w-[80px] shrink-0 overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-neutral-100 relative">
         <img
           src={bookmark.image_url ?? bookmark.url}
           alt=""
@@ -137,9 +146,9 @@ export function BookmarkItem({
         />
       </div>
     ) : isLoading ? (
-      <div className="h-12 w-15 shrink-0 animate-pulse rounded-full bg-neutral-200" />
+      <div className="h-[50px] w-[80px] shrink-0 animate-pulse rounded-lg bg-neutral-100 ring-1 ring-neutral-100" />
     ) : hasOgImage ? (
-      <div className="h-[50px] w-[80px] shrink-0 overflow-hidden rounded-lg bg-neutral-100 relative">
+      <div className="h-[50px] w-[80px] shrink-0 overflow-hidden rounded-lg bg-neutral-100 ring-1 ring-neutral-100 relative">
         <img
           src={bookmark.image_url!}
           alt=""
@@ -150,7 +159,7 @@ export function BookmarkItem({
         />
       </div>
     ) : faviconUrl ? (
-      <div className="h-[50px] w-20 shrink-0 bg-neutral-100 rounded overflow-hidden flex items-center justify-center">
+      <div className="h-[50px] w-20 shrink-0 bg-neutral-100 ring-1 ring-neutral-100 rounded overflow-hidden flex items-center justify-center">
         <img
           src={faviconUrl}
           alt=""
@@ -179,7 +188,11 @@ export function BookmarkItem({
         ) : (
           <>
             <p className="truncate leading-5">{displayText}</p>
-            {!isTextNote && (isImageBookmark || bookmark.title) && (
+            {isTextNote && snippetSourceUrl ? (
+              <p className="truncate text-neutral-400 text-sm">
+                {snippetSourceUrl}
+              </p>
+            ) : !isTextNote && (isImageBookmark || bookmark.title) ? (
               <p className="truncate text-neutral-400 text-sm">
                 {isImageBookmark &&
                 bookmark.notes &&
@@ -187,7 +200,7 @@ export function BookmarkItem({
                   ? bookmark.notes
                   : bookmark.url}
               </p>
-            )}
+            ) : null}
           </>
         )}
       </div>
