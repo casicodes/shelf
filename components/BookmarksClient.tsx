@@ -116,14 +116,17 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
   // Only show filters if: more than 5 bookmarks AND 2+ unique tags
   const shouldShowFilters = items.length > 5 && uniqueTags.size > 1;
 
-  // Filter bookmarks by active tag
-  const filteredItems =
-    activeFilter === "all"
-      ? null
-      : items.filter((b) => b.tags?.includes(activeFilter));
+  // Apply filter to search results or all items
+  const displayed = useMemo(() => {
+    // Use search results if they exist (even if empty), otherwise use all items
+    const source = searchResults !== null ? searchResults : items;
 
-  // Display priority: search results > filtered items > all items
-  const displayed = searchResults ?? filteredItems ?? items;
+    if (activeFilter === "all") {
+      return source;
+    }
+
+    return source.filter((b) => b.tags?.includes(activeFilter));
+  }, [searchResults, items, activeFilter]);
 
   // Check if URL already exists
   const checkDuplicateUrl = useCallback(
@@ -261,6 +264,7 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
           onRename={renameBookmark}
           newBookmarkIds={newBookmarkIds}
           onRemoveNewTag={removeNewTag}
+          searchQuery={query}
         />
       </div>
 

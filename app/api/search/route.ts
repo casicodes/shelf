@@ -34,6 +34,26 @@ export async function GET(req: Request) {
   const limit = parsed.data.limit ?? 50;
   const q = parsed.data.q.trim();
 
+  // Helper function to fetch tags for bookmarks
+  const fetchTagsForBookmarks = async (bookmarkIds: string[]) => {
+    if (bookmarkIds.length === 0) return new Map<string, string[]>();
+    
+    const { data: tagsData } = await supabase
+      .from("bookmark_tags")
+      .select("bookmark_id, tag")
+      .in("bookmark_id", bookmarkIds)
+      .eq("user_id", user.id);
+
+    const tagsMap = new Map<string, string[]>();
+    (tagsData ?? []).forEach(({ bookmark_id, tag }) => {
+      if (!tagsMap.has(bookmark_id)) {
+        tagsMap.set(bookmark_id, []);
+      }
+      tagsMap.get(bookmark_id)!.push(tag);
+    });
+    return tagsMap;
+  };
+
   try {
     // Always do hybrid search: semantic + keyword with weighted scoring
     const emb = await createEmbedding(q);
@@ -51,7 +71,17 @@ export async function GET(req: Request) {
 
       const query = supabase
         .from("bookmarks")
-        .select("id,url,title,description,site_name,image_url,notes,created_at")
+        .select(`
+          id,
+          url,
+          title,
+          description,
+          site_name,
+          image_url,
+          notes,
+          created_at,
+          bookmark_tags (tag)
+        `)
         .eq("user_id", user.id)
         .eq("archived", false)
         .order("created_at", { ascending: false })
@@ -71,10 +101,44 @@ export async function GET(req: Request) {
           { error: fallbackError.message },
           { status: 500 }
         );
-      return NextResponse.json({ results: fallbackData ?? [], fallback: true });
+      
+      // Transform bookmark_tags to flat tags array
+      const results = (fallbackData ?? []).map((b: any) => ({
+        id: b.id,
+        url: b.url,
+        title: b.title,
+        description: b.description,
+        site_name: b.site_name,
+        image_url: b.image_url,
+        notes: b.notes,
+        created_at: b.created_at,
+        tags: b.bookmark_tags?.map((t: any) => t.tag) ?? [],
+      }));
+      
+      return NextResponse.json({ results, fallback: true });
     }
 
-    return NextResponse.json({ results: data ?? [] });
+    // For RPC results, fetch tags separately
+    if (data && data.length > 0) {
+      const bookmarkIds = data.map((b: any) => b.bookmark_id);
+      const tagsMap = await fetchTagsForBookmarks(bookmarkIds);
+      
+      const results = data.map((b: any) => ({
+        id: b.bookmark_id,
+        url: b.url,
+        title: b.title,
+        description: b.description,
+        site_name: b.site_name,
+        image_url: b.image_url,
+        notes: b.notes,
+        created_at: b.created_at,
+        tags: tagsMap.get(b.bookmark_id) ?? [],
+      }));
+      
+      return NextResponse.json({ results });
+    }
+
+    return NextResponse.json({ results: [] });
   } catch {
     // Fallback keyword search if embedding generation fails
     const maybeUrl = normalizeUrl(q);
@@ -82,7 +146,17 @@ export async function GET(req: Request) {
 
     const query = supabase
       .from("bookmarks")
-      .select("id,url,title,description,site_name,image_url,notes,created_at")
+      .select(`
+        id,
+        url,
+        title,
+        description,
+        site_name,
+        image_url,
+        notes,
+        created_at,
+        bookmark_tags (tag)
+      `)
       .eq("user_id", user.id)
       .eq("archived", false)
       .order("created_at", { ascending: false })
@@ -99,6 +173,20 @@ export async function GET(req: Request) {
     const { data, error } = await query;
     if (error)
       return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ results: data ?? [], fallback: true });
+    
+    // Transform bookmark_tags to flat tags array
+    const results = (data ?? []).map((b: any) => ({
+      id: b.id,
+      url: b.url,
+      title: b.title,
+      description: b.description,
+      site_name: b.site_name,
+      image_url: b.image_url,
+      notes: b.notes,
+      created_at: b.created_at,
+      tags: b.bookmark_tags?.map((t: any) => t.tag) ?? [],
+    }));
+    
+    return NextResponse.json({ results, fallback: true });
   }
 }

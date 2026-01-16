@@ -70,9 +70,6 @@ export default function ResetPasswordPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6">
       <h1 className="text-2xl font-medium">Choose a new password</h1>
-      <p className="mt-1 text-neutral-500">
-        Make it long. You won’t have to type it often.
-      </p>
 
       <form onSubmit={onSubmit} className="mt-8 space-y-4">
         <div className="relative">

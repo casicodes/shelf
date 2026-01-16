@@ -15,6 +15,7 @@ type BookmarkListProps = {
   ) => Promise<{ bookmark?: Bookmark; error?: string }>;
   newBookmarkIds: Set<string>;
   onRemoveNewTag: (id: string) => void;
+  searchQuery?: string;
 };
 
 export function BookmarkList({
@@ -23,6 +24,7 @@ export function BookmarkList({
   onRename,
   newBookmarkIds,
   onRemoveNewTag,
+  searchQuery,
 }: BookmarkListProps) {
   const { isInstalled } = useExtensionInstalled();
 
@@ -39,29 +41,24 @@ export function BookmarkList({
   );
 
   if (bookmarks.length === 0) {
+    // Show search-specific empty state if there's a search query
+    if (searchQuery && searchQuery.trim()) {
+      return (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <p className="text-sm text-neutral-500">
+            {'No results found for "' + searchQuery.trim() + '"'}
+          </p>
+        </div>
+      );
+    }
+
+    // Default empty state for no bookmarks
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="mb-6 rounded-full bg-neutral-100 p-4">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M5 7.8C5 6.11984 5 5.27976 5.32698 4.63803C5.6146 4.07354 6.07354 3.6146 6.63803 3.32698C7.27976 3 8.11984 3 9.8 3H14.2C15.8802 3 16.7202 3 17.362 3.32698C17.9265 3.6146 18.3854 4.07354 18.673 4.63803C19 5.27976 19 6.11984 19 7.8V21L12 17L5 21V7.8Z"
-              stroke="black"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
         <h3 className="mb-2 font-medium text-neutral-800">No bookmarks yet</h3>
         <p className="mb-6 max-w-sm text-sm text-neutral-500">
           {isInstalled
-            ? "Paste a URL above to add your first bookmark."
+            ? ""
             : "Paste a URL above to add your first bookmark, or install the browser extension to save pages with one click."}
         </p>
         {!isInstalled && (
@@ -79,7 +76,7 @@ export function BookmarkList({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col">
       {timeCategories.map((category, index) => (
         <TimeSection
           key={category.id}

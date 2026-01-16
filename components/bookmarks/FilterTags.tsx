@@ -23,7 +23,7 @@ export function FilterTags({
           className={`rounded-md ring-1 ring-neutral-200 shadow-sm px-2 py-1 text-sm transition-all active:scale-[0.97] ${
             activeFilter === tag.id
               ? "text-neutral-800 bg-neutral-200/60"
-              : "bg-white text-neutral-500 hover:bg-neutral-100/80 hover:text-neutral-800"
+              : "bg-white text-neutral-500 hover:bg-neutral-100/50 hover:text-neutral-800"
           }`}
         >
           {tag.label}
