@@ -201,7 +201,7 @@ export default function BookmarksClient({ initial }: BookmarksClientProps) {
           <div className="flex items-center gap-4">
             {!isInstalled && (
               <a
-                href="https://github.com/yourusername/shelf/releases"
+                href="https://chrome.google.com/webstore/detail/shelf-save-bookmarks/gkccnmfilmkmpofmadleleeninlfblmd"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-neutral-500 hover:text-neutral-900 underline underline-offset-2 transition active:scale-[0.97]"

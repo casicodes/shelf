@@ -63,7 +63,7 @@ export function BookmarkList({
         </p>
         {!isInstalled && (
           <a
-            href="https://github.com/yourusername/shelf/releases"
+            href="https://chrome.google.com/webstore/detail/shelf-save-bookmarks/gkccnmfilmkmpofmadleleeninlfblmd"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-6 py-2.5 text-neutral-700 shadow-sm transition-all hover:bg-neutral-100/80 active:scale-[0.97]"
