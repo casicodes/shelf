@@ -48,8 +48,14 @@ export async function getOrCreateQueryEmbedding(
     .from("query_embeddings_cache")
     .select("embedding, embedding_model")
     .eq("query_hash", queryHash)
-    .single();
+    .maybeSingle(); // Use maybeSingle() instead of single() - returns null instead of error on no match
   const cacheCheckTime = Date.now() - cacheStart;
+
+  // If there's a real error (not just "not found"), log it and include in response
+  if (fetchError) {
+    console.warn(`[Query Cache] Error checking cache: ${fetchError.message}`, fetchError);
+    // Still continue to generate embedding even if cache check fails
+  }
 
   if (cached && !fetchError) {
     console.log(`[Query Cache] HIT: "${normalizedQuery}" (${cacheCheckTime}ms)`);
@@ -97,7 +103,7 @@ export async function getOrCreateQueryEmbedding(
   }
 
   // Not in cache - generate new embedding
-  console.log(`[Query Cache] MISS: "${normalizedQuery}" (cache check: ${cacheCheckTime}ms, fetchingError: ${fetchError?.message || "none"})`);
+  console.log(`[Query Cache] MISS: "${normalizedQuery}" (cache check: ${cacheCheckTime}ms${fetchError ? `, error: ${fetchError.message}` : ""})`);
   const embedStart = Date.now();
   const { embedding, model } = await createEmbedding(query);
   const embedTime = Date.now() - embedStart;
