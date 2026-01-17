@@ -36,5 +36,9 @@ begin
 end;
 $$;
 
+-- Grant permissions - query embeddings are shared across all users
+grant select, insert, update on public.query_embeddings_cache to authenticated;
+grant execute on function public.touch_query_cache(text) to authenticated;
+
 -- No RLS needed - query embeddings are not user-specific
 -- They're shared across all users since search queries can be the same

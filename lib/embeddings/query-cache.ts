@@ -42,13 +42,16 @@ export async function getOrCreateQueryEmbedding(
   const normalizedQuery = normalizeQuery(query);
 
   // Check cache
+  const cacheStart = Date.now();
   const { data: cached, error: fetchError } = await supabase
     .from("query_embeddings_cache")
     .select("embedding, embedding_model")
     .eq("query_hash", queryHash)
     .single();
+  const cacheCheckTime = Date.now() - cacheStart;
 
   if (cached && !fetchError) {
+    console.log(`[Query Cache] HIT: "${normalizedQuery}" (${cacheCheckTime}ms)`);
     // Update last_used_at and use_count (best effort, don't fail on error)
     // Fire-and-forget: update cache stats in background
     void (async () => {
@@ -89,7 +92,11 @@ export async function getOrCreateQueryEmbedding(
   }
 
   // Not in cache - generate new embedding
+  console.log(`[Query Cache] MISS: "${normalizedQuery}" (cache check: ${cacheCheckTime}ms, fetchingError: ${fetchError?.message || "none"})`);
+  const embedStart = Date.now();
   const { embedding, model } = await createEmbedding(query);
+  const embedTime = Date.now() - embedStart;
+  console.log(`[Query Cache] Generated embedding in ${embedTime}ms`);
 
   // Store in cache (ignore errors - caching is best effort)
   const embeddingLiteral = vectorToSqlLiteral(embedding);
@@ -107,7 +114,9 @@ export async function getOrCreateQueryEmbedding(
 
   if (insertError) {
     // Log but don't fail - caching is non-critical
-    console.warn("Failed to cache query embedding:", insertError.message);
+    console.warn(`[Query Cache] Failed to cache: ${insertError.message}`, insertError);
+  } else {
+    console.log(`[Query Cache] CACHED: "${normalizedQuery}"`);
   }
 
   return { embedding, model };
