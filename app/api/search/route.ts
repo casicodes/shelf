@@ -55,6 +55,7 @@ export async function GET(req: Request) {
   };
 
   let embResult: Awaited<ReturnType<typeof getOrCreateQueryEmbedding>> | null = null;
+  let rpcError: string | undefined;
   try {
     // Always do hybrid search: semantic + keyword with weighted scoring
     // Use cached embedding if available
@@ -65,6 +66,10 @@ export async function GET(req: Request) {
       p_query_text: q,
       p_match_count: limit,
     });
+    
+    if (error) {
+      rpcError = error.message;
+    }
 
     if (error) {
       // Fallback to keyword-only search if hybrid fails
@@ -123,11 +128,11 @@ export async function GET(req: Request) {
         _cache: embResult ? {
           hit: embResult.cacheHit,
           embedTime: embResult.embedTime,
-          error: embResult.cacheError,
+          error: rpcError || embResult.cacheError,
         } : {
           hit: false,
           embedTime: undefined,
-          error: "Unknown error",
+          error: rpcError || "Unknown error",
         }
       });
     }
@@ -172,7 +177,9 @@ export async function GET(req: Request) {
       }
     });
   } catch (err) {
-    // Fallback keyword search if embedding generation fails
+    // Fallback keyword search if embedding generation or RPC fails
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.error("[Search] Error in hybrid search:", errorMessage, err);
     const maybeUrl = normalizeUrl(q);
     const domain = urlDomain(maybeUrl);
 
@@ -229,7 +236,7 @@ export async function GET(req: Request) {
       } : {
         hit: false,
         embedTime: undefined,
-        error: "Embedding generation failed",
+        error: `Search failed: ${err instanceof Error ? err.message : String(err)}`,
       }
     });
   }
