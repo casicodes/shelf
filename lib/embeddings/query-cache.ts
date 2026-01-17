@@ -50,9 +50,14 @@ export async function getOrCreateQueryEmbedding(
 
   if (cached && !fetchError) {
     // Update last_used_at and use_count (best effort, don't fail on error)
-    supabase.rpc("touch_query_cache", { p_query_hash: queryHash }).catch(() => {
-      // Ignore errors - cache touch is non-critical
-    });
+    // Fire-and-forget: update cache stats in background
+    void (async () => {
+      try {
+        await supabase.rpc("touch_query_cache", { p_query_hash: queryHash });
+      } catch {
+        // Ignore errors - cache touch is non-critical
+      }
+    })();
     
     // Convert pgvector format to array
     // Supabase JS client typically returns vectors as arrays
