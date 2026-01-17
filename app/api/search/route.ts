@@ -54,10 +54,11 @@ export async function GET(req: Request) {
     return tagsMap;
   };
 
+  let embResult: Awaited<ReturnType<typeof getOrCreateQueryEmbedding>> | null = null;
   try {
     // Always do hybrid search: semantic + keyword with weighted scoring
     // Use cached embedding if available
-    const embResult = await getOrCreateQueryEmbedding(q);
+    embResult = await getOrCreateQueryEmbedding(q);
     const { data, error } = await supabase.rpc("match_bookmarks_hybrid", {
       p_user_id: user.id,
       p_query_embedding: `[${embResult.embedding.join(",")}]`,
@@ -119,10 +120,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ 
         results, 
         fallback: true,
-        _cache: {
+        _cache: embResult ? {
           hit: embResult.cacheHit,
           embedTime: embResult.embedTime,
           error: embResult.cacheError,
+        } : {
+          hit: false,
+          embedTime: undefined,
+          error: "Unknown error",
         }
       });
     }
@@ -154,15 +159,19 @@ export async function GET(req: Request) {
       });
     }
 
-      return NextResponse.json({ 
-        results: [],
-        _cache: {
-          hit: embResult.cacheHit,
-          embedTime: embResult.embedTime,
-          error: embResult.cacheError,
-        }
-      });
-  } catch {
+    return NextResponse.json({ 
+      results: [],
+      _cache: embResult ? {
+        hit: embResult.cacheHit,
+        embedTime: embResult.embedTime,
+        error: embResult.cacheError,
+      } : {
+        hit: false,
+        embedTime: undefined,
+        error: "Unknown error",
+      }
+    });
+  } catch (err) {
     // Fallback keyword search if embedding generation fails
     const maybeUrl = normalizeUrl(q);
     const domain = urlDomain(maybeUrl);
@@ -213,10 +222,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ 
       results, 
       fallback: true,
-      _cache: {
+      _cache: embResult ? {
+        hit: embResult.cacheHit,
+        embedTime: embResult.embedTime,
+        error: embResult.cacheError,
+      } : {
         hit: false,
         embedTime: undefined,
+        error: "Embedding generation failed",
       }
     });
-  }
-}
+  } catch (err) {
+    // Fallback keyword search if embedding generation fails
+    console.error("[Search] Error in hybrid search:", err);
