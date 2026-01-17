@@ -57,10 +57,10 @@ export async function GET(req: Request) {
   try {
     // Always do hybrid search: semantic + keyword with weighted scoring
     // Use cached embedding if available
-    const emb = await getOrCreateQueryEmbedding(q);
+    const embResult = await getOrCreateQueryEmbedding(q);
     const { data, error } = await supabase.rpc("match_bookmarks_hybrid", {
       p_user_id: user.id,
-      p_query_embedding: `[${emb.embedding.join(",")}]`,
+      p_query_embedding: `[${embResult.embedding.join(",")}]`,
       p_query_text: q,
       p_match_count: limit,
     });
@@ -116,7 +116,14 @@ export async function GET(req: Request) {
         tags: b.bookmark_tags?.map((t: any) => t.tag) ?? [],
       }));
       
-      return NextResponse.json({ results, fallback: true });
+      return NextResponse.json({ 
+        results, 
+        fallback: true,
+        _cache: {
+          hit: embResult.cacheHit,
+          embedTime: embResult.embedTime,
+        }
+      });
     }
 
     // For RPC results, fetch tags separately
@@ -136,10 +143,22 @@ export async function GET(req: Request) {
         tags: tagsMap.get(b.bookmark_id) ?? [],
       }));
       
-      return NextResponse.json({ results });
+      return NextResponse.json({ 
+        results,
+        _cache: {
+          hit: embResult.cacheHit,
+          embedTime: embResult.embedTime,
+        }
+      });
     }
 
-    return NextResponse.json({ results: [] });
+    return NextResponse.json({ 
+      results: [],
+      _cache: {
+        hit: embResult.cacheHit,
+        embedTime: embResult.embedTime,
+      }
+    });
   } catch {
     // Fallback keyword search if embedding generation fails
     const maybeUrl = normalizeUrl(q);
@@ -188,6 +207,13 @@ export async function GET(req: Request) {
       tags: b.bookmark_tags?.map((t: any) => t.tag) ?? [],
     }));
     
-    return NextResponse.json({ results, fallback: true });
+    return NextResponse.json({ 
+      results, 
+      fallback: true,
+      _cache: {
+        hit: false,
+        embedTime: undefined,
+      }
+    });
   }
 }

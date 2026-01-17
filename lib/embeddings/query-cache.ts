@@ -31,11 +31,12 @@ export async function hashQuery(query: string): Promise<string> {
  */
 export async function getOrCreateQueryEmbedding(
   query: string
-): Promise<{ embedding: number[]; model: string }> {
+): Promise<{ embedding: number[]; model: string; cacheHit: boolean; embedTime?: number }> {
   const supabase = await createClient();
   if (!supabase) {
     // Fallback: generate embedding if Supabase not available
-    return createEmbedding(query);
+    const { embedding, model } = await createEmbedding(query);
+    return { embedding, model, cacheHit: false };
   }
 
   const queryHash = await hashQuery(query);
@@ -73,21 +74,25 @@ export async function getOrCreateQueryEmbedding(
         embedding = JSON.parse(cached.embedding);
       } catch {
         // If parsing fails, regenerate
-        return createEmbedding(query);
+        const { embedding: newEmb, model: newModel } = await createEmbedding(query);
+        return { embedding: newEmb, model: newModel, cacheHit: false };
       }
     } else {
       // Unknown format - regenerate
-      return createEmbedding(query);
+      const { embedding: newEmb, model: newModel } = await createEmbedding(query);
+      return { embedding: newEmb, model: newModel, cacheHit: false };
     }
 
     // Validate embedding is a proper array
     if (!Array.isArray(embedding) || embedding.length === 0) {
-      return createEmbedding(query);
+      const { embedding: newEmb, model: newModel } = await createEmbedding(query);
+      return { embedding: newEmb, model: newModel, cacheHit: false };
     }
 
     return {
       embedding,
       model: cached.embedding_model,
+      cacheHit: true,
     };
   }
 
@@ -119,5 +124,5 @@ export async function getOrCreateQueryEmbedding(
     console.log(`[Query Cache] CACHED: "${normalizedQuery}"`);
   }
 
-  return { embedding, model };
+  return { embedding, model, cacheHit: false, embedTime };
 }
