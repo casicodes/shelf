@@ -31,7 +31,7 @@ export async function hashQuery(query: string): Promise<string> {
  */
 export async function getOrCreateQueryEmbedding(
   query: string
-): Promise<{ embedding: number[]; model: string; cacheHit: boolean; embedTime?: number }> {
+): Promise<{ embedding: number[]; model: string; cacheHit: boolean; embedTime?: number; cacheError?: string }> {
   const supabase = await createClient();
   if (!supabase) {
     // Fallback: generate embedding if Supabase not available
@@ -52,7 +52,9 @@ export async function getOrCreateQueryEmbedding(
   const cacheCheckTime = Date.now() - cacheStart;
 
   // If there's a real error (not just "not found"), log it and include in response
+  let cacheError: string | undefined;
   if (fetchError) {
+    cacheError = fetchError.message;
     console.warn(`[Query Cache] Error checking cache: ${fetchError.message}`, fetchError);
     // Still continue to generate embedding even if cache check fails
   }
@@ -99,6 +101,7 @@ export async function getOrCreateQueryEmbedding(
       embedding,
       model: cached.embedding_model,
       cacheHit: true,
+      cacheError: undefined,
     };
   }
 
@@ -125,10 +128,12 @@ export async function getOrCreateQueryEmbedding(
 
   if (insertError) {
     // Log but don't fail - caching is non-critical
-    console.warn(`[Query Cache] Failed to cache: ${insertError.message}`, insertError);
+    const insertErrorMsg = `Failed to cache: ${insertError.message}`;
+    console.warn(`[Query Cache] ${insertErrorMsg}`, insertError);
+    return { embedding, model, cacheHit: false, embedTime, cacheError: insertErrorMsg };
   } else {
     console.log(`[Query Cache] CACHED: "${normalizedQuery}"`);
   }
 
-  return { embedding, model, cacheHit: false, embedTime };
+  return { embedding, model, cacheHit: false, embedTime, cacheError };
 }

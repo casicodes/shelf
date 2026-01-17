@@ -122,6 +122,7 @@ export async function GET(req: Request) {
         _cache: {
           hit: embResult.cacheHit,
           embedTime: embResult.embedTime,
+          error: embResult.cacheError,
         }
       });
     }
@@ -148,17 +149,19 @@ export async function GET(req: Request) {
         _cache: {
           hit: embResult.cacheHit,
           embedTime: embResult.embedTime,
+          error: embResult.cacheError,
         }
       });
     }
 
-    return NextResponse.json({ 
-      results: [],
-      _cache: {
-        hit: embResult.cacheHit,
-        embedTime: embResult.embedTime,
-      }
-    });
+      return NextResponse.json({ 
+        results: [],
+        _cache: {
+          hit: embResult.cacheHit,
+          embedTime: embResult.embedTime,
+          error: embResult.cacheError,
+        }
+      });
   } catch {
     // Fallback keyword search if embedding generation fails
     const maybeUrl = normalizeUrl(q);
