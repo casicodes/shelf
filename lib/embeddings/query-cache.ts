@@ -31,7 +31,13 @@ export async function hashQuery(query: string): Promise<string> {
  */
 export async function getOrCreateQueryEmbedding(
   query: string
-): Promise<{ embedding: number[]; model: string; cacheHit: boolean; embedTime?: number; cacheError?: string }> {
+): Promise<{ embedding: number[]; model: string; cacheHit: boolean; embedTime?: number; cacheError?: string } | null> {
+  // Check if OpenAI API key is available
+  if (!process.env.OPENAI_API_KEY) {
+    // No API key - skip embeddings, return null to signal keyword-only search
+    return null;
+  }
+
   const supabase = await createClient();
   if (!supabase) {
     // Fallback: generate embedding if Supabase not available

@@ -57,9 +57,15 @@ export async function GET(req: Request) {
   let embResult: Awaited<ReturnType<typeof getOrCreateQueryEmbedding>> | null = null;
   let rpcError: string | undefined;
   try {
-    // Always do hybrid search: semantic + keyword with weighted scoring
-    // Use cached embedding if available
+    // Try hybrid search if embeddings are available
     embResult = await getOrCreateQueryEmbedding(q);
+    
+    // If no embeddings (no API key), skip directly to keyword search
+    if (!embResult) {
+      throw new Error("Embeddings not available - using keyword search");
+    }
+    
+    // Use cached embedding if available
     const { data, error } = await supabase.rpc("match_bookmarks_hybrid", {
       p_user_id: user.id,
       p_query_embedding: `[${embResult.embedding.join(",")}]`,
@@ -236,7 +242,9 @@ export async function GET(req: Request) {
       } : {
         hit: false,
         embedTime: undefined,
-        error: `Search failed: ${err instanceof Error ? err.message : String(err)}`,
+        error: err instanceof Error && err.message.includes("Embeddings not available") 
+          ? undefined // Don't show error for missing API key - keyword search is working
+          : `Search failed: ${err instanceof Error ? err.message : String(err)}`,
       }
     });
   }
