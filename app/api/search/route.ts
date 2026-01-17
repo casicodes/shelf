@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createEmbedding } from "@/lib/embeddings";
+import { getOrCreateQueryEmbedding } from "@/lib/embeddings/query-cache";
 import { urlDomain, normalizeUrl } from "@/lib/url/normalize";
 
 const SearchSchema = z.object({
@@ -56,7 +56,8 @@ export async function GET(req: Request) {
 
   try {
     // Always do hybrid search: semantic + keyword with weighted scoring
-    const emb = await createEmbedding(q);
+    // Use cached embedding if available
+    const emb = await getOrCreateQueryEmbedding(q);
     const { data, error } = await supabase.rpc("match_bookmarks_hybrid", {
       p_user_id: user.id,
       p_query_embedding: `[${emb.embedding.join(",")}]`,
