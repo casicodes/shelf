@@ -208,8 +208,6 @@ export function useBookmarks(initial: Bookmark[]) {
 
           try {
             const res = await refreshBookmarkMetadata(b.id);
-            console.log("OG REFRESH RESPONSE", b.url, res);
-
             const updated = res.bookmark;
 
             if (cancelled) return;

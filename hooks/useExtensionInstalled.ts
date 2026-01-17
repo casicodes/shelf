@@ -13,9 +13,7 @@ export function useExtensionInstalled() {
     // Check if extension marker exists (set by content script)
     const checkMarker = () => {
       const marker = (window as any).__SHELF_EXTENSION_INSTALLED;
-      console.log("[Extension Detection] Checking marker:", marker);
       if (marker) {
-        console.log("[Extension Detection] Extension found!");
         setIsInstalled(true);
         return true;
       }
@@ -23,7 +21,6 @@ export function useExtensionInstalled() {
     };
 
     // Check immediately
-    console.log("[Extension Detection] Initial check");
     if (checkMarker()) {
       return;
     }
@@ -32,7 +29,6 @@ export function useExtensionInstalled() {
 
     // Listen for custom event from extension
     const handleExtensionInstalled = () => {
-      console.log("[Extension Detection] Event received: shelfExtensionInstalled");
       setIsInstalled(true);
       if (interval) {
         clearInterval(interval);
@@ -40,7 +36,6 @@ export function useExtensionInstalled() {
     };
 
     window.addEventListener("shelfExtensionInstalled", handleExtensionInstalled);
-    console.log("[Extension Detection] Listening for shelfExtensionInstalled event");
 
     // Also check periodically in case extension loads after page load
     interval = setInterval(() => {

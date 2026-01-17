@@ -28,12 +28,6 @@ export function BookmarkList({
 }: BookmarkListProps) {
   const { isInstalled } = useExtensionInstalled();
 
-  // Debug: Show extension status
-  console.log(
-    "Extension detected:",
-    isInstalled ? "Installed extension" : "No extension"
-  );
-
   // Categorize bookmarks by time periods
   const timeCategories = useMemo(
     () => categorizeBookmarksByTime(bookmarks),
