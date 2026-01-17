@@ -15,17 +15,50 @@ export default function ExtensionCallbackPage() {
   const [isPending, startTransition] = useTransition();
   const [isConnected, setIsConnected] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const extensionReadyRef = useRef(false);
+  const handshakeNonceRef = useRef<string | null>(null);
+
+  const sendTokenToExtension = (token: string) => {
+    // Only send to same origin, not "*"
+    // The extension content script runs in page context and will receive this
+    const message: { type: string; token: string; nonce?: string | null } = {
+      type: "SHELF_AUTH_TOKEN",
+      token,
+    };
+    
+    // Include nonce if handshake was successful
+    if (handshakeNonceRef.current) {
+      message.nonce = handshakeNonceRef.current;
+    }
+    
+    window.postMessage(message, window.location.origin);
+  };
 
   useEffect(() => {
     // Create client only after mount to avoid SSR/window issues
-
-    console.log("SUPABASE_URL =", process.env.NEXT_PUBLIC_SUPABASE_URL);
-    console.log(
-      "SUPABASE_KEY starts with =",
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 18)
-    );
-
     supabaseRef.current = createClient();
+
+    // Set up secure handshake with extension
+    function handleExtensionReady(event: MessageEvent) {
+      // Only accept messages from same origin
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data?.type === "SHELF_EXTENSION_READY") {
+        extensionReadyRef.current = true;
+        handshakeNonceRef.current = event.data.nonce || null;
+      }
+    }
+
+    window.addEventListener("message", handleExtensionReady);
+
+    // Initiate handshake - request extension to identify itself
+    window.postMessage({ type: "SHELF_EXTENSION_HANDSHAKE" }, window.location.origin);
+
+    // Give extension time to respond (max 2 seconds)
+    const handshakeTimeout = setTimeout(() => {
+      // If no response, extension might not be installed
+      // We'll still try to send token, but with origin restriction
+    }, 2000);
 
     async function checkAuth() {
       const client = supabaseRef.current;
@@ -40,6 +73,8 @@ export default function ExtensionCallbackPage() {
 
       const token = session?.access_token;
       if (token) {
+        // Wait a bit for handshake if extension is loading
+        await new Promise((resolve) => setTimeout(resolve, 100));
         sendTokenToExtension(token);
         setIsConnected(true);
       }
@@ -47,12 +82,12 @@ export default function ExtensionCallbackPage() {
     }
 
     checkAuth();
-  }, []);
 
-  function sendTokenToExtension(token: string) {
-    // TODO (recommended): validate the origin instead of "*"
-    window.postMessage({ type: "SHELF_AUTH_TOKEN", token }, "*");
-  }
+    return () => {
+      window.removeEventListener("message", handleExtensionReady);
+      clearTimeout(handshakeTimeout);
+    };
+  }, []);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -703,9 +703,33 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // This function runs in the context of the auth callback page
 function captureTokenFromPage() {
+  // Generate a nonce for this session to validate message authenticity
+  const nonce = Math.random().toString(36).substring(2, 15) + 
+                Math.random().toString(36).substring(2, 15);
+  
   // Listen for postMessage from the page
   window.addEventListener("message", (event) => {
+    // Only accept messages from same origin
+    if (event.origin !== window.location.origin) return;
+    
+    // Handle handshake request
+    if (event.data?.type === "SHELF_EXTENSION_HANDSHAKE") {
+      // Respond with ready message and nonce
+      window.postMessage(
+        { type: "SHELF_EXTENSION_READY", nonce },
+        window.location.origin
+      );
+      return;
+    }
+    
+    // Handle auth token
     if (event.data?.type === "SHELF_AUTH_TOKEN" && event.data?.token) {
+      // Validate nonce if provided (optional for backwards compatibility)
+      if (event.data.nonce && event.data.nonce !== nonce) {
+        console.warn("Shelf Extension: Token message nonce mismatch");
+        return;
+      }
+      
       // Send token to background script
       chrome.runtime.sendMessage({
         type: "SHELF_AUTH_TOKEN",
